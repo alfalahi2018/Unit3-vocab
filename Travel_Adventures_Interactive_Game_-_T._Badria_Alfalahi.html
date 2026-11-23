@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Adventures - Interactive Learning Game | T. Badria Alfalahi</title>
+    <!-- Load Fredoka & Nunito for a joyful, clear educational & playful look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for interactive sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti for celebrations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* Base fonts and travel theme colors */
+        :root {
+            --font-display: 'Fredoka', sans-serif;
+            --font-body: 'Nunito', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: linear-gradient(180deg, #E0F2FE 0%, #FEF3C7 65%, #FDE68A 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        h1, h2, h3, .display-font {
+            font-family: var(--font-display);
+        }
+
+        /* Floating clouds in the background */
+        @keyframes floatCloud {
+            0% { transform: translateX(-120px); }
+            100% { transform: translateX(115vw); }
+        }
+
+        .cloud {
+            position: fixed;
+            opacity: 0.7;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatCloud linear infinite;
+        }
+
+        /* Dashed flashcard frame matching the original attached cards */
+        .flashcard-border {
+            border: 2.5px dashed #94A3B8;
+            background: #FFFFFF;
+            box-shadow: 0 10px 25px -5px rgba(14, 116, 144, 0.14), 0 8px 10px -6px rgba(14, 116, 144, 0.08);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .flashcard-border:hover {
+            transform: translateY(-4px);
+            border-color: #0284C7;
+            box-shadow: 0 18px 24px -5px rgba(2, 132, 199, 0.22);
+        }
+
+        /* Clean framing for the original attached flashcard illustrations */
+        .original-card-crop {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 16px;
+            border: 1.5px solid #E2E8F0;
+            background: #FFFFFF;
+        }
+
+        /* 3D card flip effects for Memory Game */
+        .memory-card-perspective {
+            perspective: 1000px;
+        }
+
+        .memory-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-style: preserve-3d;
+        }
+
+        .memory-card.flipped .memory-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .memory-card-front,
+        .memory-card-back {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 22px;
+        }
+
+        .memory-card-back {
+            transform: rotateY(180deg);
+        }
+
+        /* Tactile 3D buttons */
+        .btn-3d {
+            transition: all 0.15s ease;
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
+        }
+        .btn-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        /* Shake animation on wrong answer */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Pop animation on correct answer */
+        @keyframes popSuccess {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: popSuccess 0.4s ease-out;
+        }
+
+        /* Drag & Drop styling */
+        .draggable-word {
+            cursor: grab;
+            touch-action: none;
+        }
+        .draggable-word:active {
+            cursor: grabbing;
+        }
+        .drop-zone {
+            transition: all 0.2s ease;
+        }
+        .drop-zone.drag-over {
+            background-color: #E0F2FE;
+            border-color: #0284C7;
+            transform: scale(1.03);
+        }
+
+        /* SVG overlay for matching lines */
+        #match-svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="text-slate-800 relative">
+
+    <!-- Animated background clouds -->
+    <div class="cloud top-10 text-6xl" style="animation-duration: 45s;">☁️</div>
+    <div class="cloud top-32 text-5xl" style="animation-duration: 65s; animation-delay: -20s;">☁️</div>
+    <div class="cloud top-20 text-7xl" style="animation-duration: 55s; animation-delay: -35s;">⛅</div>
+
+    <!-- Main application container -->
+    <div class="relative z-10 max-w-5xl mx-auto px-4 py-4 md:py-6 flex flex-col min-h-screen">
+        
+        <!-- Top Header -->
+        <header class="bg-white/90 backdrop-blur-md rounded-3xl p-4 shadow-lg border-2 border-sky-200 flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center text-2xl shadow-md text-white">
+                    ✈️
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold text-sky-900">Travel & Journey Adventures</h1>
+                    <p class="text-xs md:text-sm text-amber-700 font-extrabold">Prepared by T. Badria Alfalahi</p>
+                </div>
+            </div>
+
+            <!-- Score & Sound controls -->
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-100 border-2 border-amber-300 px-4 py-1.5 rounded-2xl flex items-center gap-2 shadow-inner">
+                    <span class="text-xl">⭐</span>
+                    <span id="score-display" class="display-font font-bold text-lg text-amber-800">0</span>
+                </div>
+                
+                <button id="sound-toggle-btn" onclick="toggleSound()" class="btn-3d bg-sky-500 hover:bg-sky-600 text-white p-2.5 rounded-2xl text-lg flex items-center justify-center" title="Toggle Sound">
+                    🔊
+                </button>
+            </div>
+        </header>
+
+        <!-- Game Mode Navigation -->
+        <nav class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-6">
+            <button onclick="switchMode('learn')" id="tab-learn" class="mode-tab btn-3d bg-emerald-500 text-white font-bold py-3 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs md:text-sm border-2 border-emerald-600">
+                <span>📖</span> Flashcards
+            </button>
+            <button onclick="switchMode('drag')" id="tab-drag" class="mode-tab btn-3d bg-white text-slate-700 hover:bg-sky-50 font-bold py-3 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs md:text-sm border-2 border-slate-200">
+                <span>🎯</span> Drag & Drop
+            </button>
+            <button onclick="switchMode('match')" id="tab-match" class="mode-tab btn-3d bg-white text-slate-700 hover:bg-sky-50 font-bold py-3 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs md:text-sm border-2 border-slate-200">
+                <span>🔗</span> Match Pairs
+            </button>
+            <button onclick="switchMode('fill')" id="tab-fill" class="mode-tab btn-3d bg-white text-slate-700 hover:bg-sky-50 font-bold py-3 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs md:text-sm border-2 border-slate-200">
+                <span>✍️</span> Complete
+            </button>
+            <button onclick="switchMode('memory')" id="tab-memory" class="mode-tab btn-3d bg-white text-slate-700 hover:bg-sky-50 font-bold py-3 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs md:text-sm border-2 border-slate-200">
+                <span>🃏</span> Memory
+            </button>
+            <button onclick="switchMode('timer')" id="tab-timer" class="mode-tab btn-3d bg-white text-slate-700 hover:bg-sky-50 font-bold py-3 px-3 rounded-2xl flex items-center justify-center gap-1.5 text-xs md:text-sm border-2 border-slate-200">
+                <span>⏱️</span> Time Rush
+            </button>
+        </nav>
+
+        <!-- Dynamic Game Area -->
+        <main id="game-container" class="flex-grow flex flex-col">
+            <!-- Injected via JavaScript -->
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-xs md:text-sm text-sky-900/75 font-bold py-2">
+            Tap any flashcard or button to hear the pronunciation • Created by <span class="text-sky-950 font-extrabold">T. Badria Alfalahi</span> 🎧
+        </footer>
+    </div>
+
+    <!-- Custom Modal (replaces alert) -->
+    <div id="custom-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-amber-400 transform transition-all scale-95" id="modal-box">
+            <div id="modal-emoji" class="text-6xl mb-3 animate-bounce">🏆</div>
+            <h2 id="modal-title" class="text-2xl font-bold text-sky-900 mb-2">Awesome Job!</h2>
+            <p id="modal-message" class="text-slate-600 font-semibold mb-6">You completed this round brilliantly!</p>
+            <button onclick="closeModal()" class="btn-3d w-full bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold py-3 px-6 rounded-2xl text-lg display-font">
+                Continue Playing 🚀
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Vocabulary database based on the 12 attached original flashcards.
+         * Each item references its original attached image file with calibrated framing.
+         */
+        const VOCABULARY = [
+            {
+                id: 'get_on',
+                word: 'get on',
+                clue: 'Step up into the bus',
+                sentence: 'The boy is ready to _____ the yellow school bus.',
+                hint: 'Climbing up the steps into the bus',
+                imgSrc: '26708ea4-06d1-453b-9c7a-c311bd2d07e8.jpeg',
+                imgPos: 'center 14%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'get_off',
+                word: 'get off',
+                clue: 'Step down from the bus',
+                sentence: 'After school, the children _____ the bus carefully.',
+                hint: 'Stepping down onto the sidewalk',
+                imgSrc: '26708ea4-06d1-453b-9c7a-c311bd2d07e8.jpeg',
+                imgPos: 'center 78%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'arrive',
+                word: 'arrive',
+                clue: 'Reach a destination or airport',
+                sentence: 'We _____ at the airport two hours before our flight.',
+                hint: 'Reaching the airport terminal with luggage',
+                imgSrc: '923711f9-bde9-4fb7-949f-a71fa3ac3b02.jpeg',
+                imgPos: 'center 14%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'leave',
+                word: 'leave',
+                clue: 'Go away or depart',
+                sentence: 'The family waves goodbye as they _____ home in their red car.',
+                hint: 'Driving off on the road with bags on top',
+                imgSrc: '923711f9-bde9-4fb7-949f-a71fa3ac3b02.jpeg',
+                imgPos: 'center 78%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'explore',
+                word: 'explore',
+                clue: 'Discover and look around a place',
+                sentence: 'Tourists love to _____ historic forts and castles.',
+                hint: 'Walking together to check out the fort',
+                imgSrc: 'a97664fb-5f98-4ed8-b425-533fe5a0b366.jpeg',
+                imgPos: 'center 14%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'take_a_seat',
+                word: 'take a seat',
+                clue: 'Sit down in a chair or seat',
+                sentence: 'Please _____ and fasten your seatbelt before takeoff.',
+                hint: 'Sitting down in the seat and buckling up',
+                imgSrc: 'a97664fb-5f98-4ed8-b425-533fe5a0b366.jpeg',
+                imgPos: 'center 78%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'travel_by_train',
+                word: 'travel by train',
+                clue: 'Ride on railway carriages',
+                sentence: 'We like to _____ and watch the green hills through the window.',
+                hint: 'Riding inside a train past green hills',
+                imgSrc: 'cab976bd-2744-4120-8191-e2cd2aa45625.jpeg',
+                imgPos: 'center 14%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'catch_a_bus',
+                word: 'catch a bus',
+                clue: 'Hurry to get on a bus',
+                sentence: 'Hurry up! Run to the bus stop to _____ to the city.',
+                hint: 'Running toward the bus at the stop',
+                imgSrc: 'cab976bd-2744-4120-8191-e2cd2aa45625.jpeg',
+                imgPos: 'center 78%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'pack_your_suitcase',
+                word: 'pack your suitcase',
+                clue: 'Put clothes and items in a bag',
+                sentence: 'Don’t forget to _____ with clothes before the trip!',
+                hint: 'Folding clothes neatly inside a suitcase',
+                imgSrc: '7babdbad-2415-4a92-b6e0-a3611aa78540.jpeg',
+                imgPos: 'center 14%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'go_on_a_journey',
+                word: 'go on a journey',
+                clue: 'Set out on a trip or adventure',
+                sentence: 'Our family is excited to _____ around the world.',
+                hint: 'Heading out together with bags toward the plane',
+                imgSrc: '7babdbad-2415-4a92-b6e0-a3611aa78540.jpeg',
+                imgPos: 'center 78%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'take_off',
+                word: 'take off',
+                clue: 'Leave the ground and fly up',
+                sentence: 'Look! The colorful airplane is starting to _____ into the sky.',
+                hint: 'The plane rising up into the clouds',
+                imgSrc: 'cf77e703-af5a-459b-ad48-45cb2c51c6a6.jpeg',
+                imgPos: 'center 14%',
+                imgScale: 'scale-105'
+            },
+            {
+                id: 'land',
+                word: 'land',
+                clue: 'Come down onto the runway',
+                sentence: 'The pilot will _____ the plane safely on the runway.',
+                hint: 'The plane touching down on the runway',
+                imgSrc: 'cf77e703-af5a-459b-ad48-45cb2c51c6a6.jpeg',
+                imgPos: 'center 78%',
+                imgScale: 'scale-105'
+            }
+        ];
+
+        // Render original attached image cleanly with fallback
+        function renderCardImage(item, extraClasses = '') {
+            return `
+                <div class="w-full overflow-hidden rounded-2xl bg-white flex items-center justify-center relative ${extraClasses}">
+                    <img src="${item.imgSrc}"
+                         alt="${item.word}"
+                         style="object-position: ${item.imgPos};"
+                         class="original-card-crop ${item.imgScale} transition-transform duration-300"
+                         onerror="handleImageFallback(this, '${item.id}', '${item.word.replace(/'/g, "\\'")}', '${item.clue.replace(/'/g, "\\'")}')">
+                </div>
+            `;
+        }
+
+        // Fallback SVG generator when local image paths are blocked by iframe sandboxing
+        function handleImageFallback(imgEl, id, word, clue) {
+            if (!imgEl || imgEl.dataset.fallbackApplied === 'true') return;
+            imgEl.dataset.fallbackApplied = 'true';
+
+            const themeIcons = {
+                get_on: { emoji: '🚌⬆️', bg: '#FEF3C7', accent: '#D97706' },
+                get_off: { emoji: '🚌⬇️', bg: '#E0F2FE', accent: '#0284C7' },
+                arrive: { emoji: '🛬🧳', bg: '#DCFCE7', accent: '#15803D' },
+                leave: { emoji: '🚗👋', bg: '#FEE2E2', accent: '#DC2626' },
+                explore: { emoji: '🏰🧭', bg: '#FEF9C3', accent: '#CA8A04' },
+                take_a_seat: { emoji: '💺✨', bg: '#E0E7FF', accent: '#4338CA' },
+                travel_by_train: { emoji: '🚆🌄', bg: '#D1FAE5', accent: '#047857' },
+                catch_a_bus: { emoji: '🏃🚌', bg: '#FFEDD5', accent: '#EA580C' },
+                pack_your_suitcase: { emoji: '🧳👕', bg: '#FCE7F3', accent: '#DB2777' },
+                go_on_a_journey: { emoji: '🌍✈️', bg: '#E0F2FE', accent: '#0369A1' },
+                take_off: { emoji: '🛫☁️', bg: '#DBEAFE', accent: '#1D4ED8' },
+                land: { emoji: '🛬🛤️', bg: '#FEF3C7', accent: '#B45309' }
+            };
+
+            const cfg = themeIcons[id] || { emoji: '✈️', bg: '#E0F2FE', accent: '#0284C7' };
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+                    <rect width="480" height="360" rx="24" fill="${cfg.bg}"/>
+                    <rect x="16" y="16" width="448" height="328" rx="18" fill="#FFFFFF" stroke="${cfg.accent}" stroke-width="3" stroke-dasharray="10 8"/>
+                    <text x="240" y="155" font-size="78" text-anchor="middle" dominant-baseline="middle">${cfg.emoji}</text>
+                    <text x="240" y="238" font-family="Fredoka, Arial, sans-serif" font-size="30" font-weight="700" fill="#0F172A" text-anchor="middle">${word}</text>
+                    <text x="240" y="276" font-family="Nunito, Arial, sans-serif" font-size="17" font-weight="700" fill="#475569" text-anchor="middle">${clue}</text>
+                </svg>
+            `;
+            imgEl.src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+        }
+
+        // Game state variables
+        let currentMode = 'learn';
+        let score = 0;
+        let soundEnabled = true;
+        let synth = null;
+        let timerInterval = null;
+
+        function clearActiveTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // Initialize Tone.js audio engine on user interaction
+        function initAudio() {
+            if (!synth && typeof Tone !== 'undefined') {
+                Tone.start();
+                synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.volume.value = -8;
+            }
+        }
+
+        // Sound effects helper
+        function playSFX(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!synth) return;
+
+            const now = Tone.now();
+            if (type === 'click') {
+                synth.triggerAttackRelease("C5", "32n", now);
+            } else if (type === 'correct') {
+                synth.triggerAttackRelease(["C5", "E5", "G5"], "16n", now);
+                synth.triggerAttackRelease("C6", "8n", now + 0.12);
+            } else if (type === 'wrong') {
+                synth.triggerAttackRelease(["E3", "Bb2"], "8n", now);
+            } else if (type === 'win') {
+                synth.triggerAttackRelease("C5", "16n", now);
+                synth.triggerAttackRelease("E5", "16n", now + 0.1);
+                synth.triggerAttackRelease("G5", "16n", now + 0.2);
+                synth.triggerAttackRelease("C6", "4n", now + 0.3);
+            }
+        }
+
+        // Text-to-speech pronunciation
+        function speakWord(text) {
+            playSFX('click');
+            if (!soundEnabled) return;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.88;
+                utterance.pitch = 1.05;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-toggle-btn');
+            btn.textContent = soundEnabled ? '🔊' : '🔇';
+            btn.classList.toggle('bg-sky-500', soundEnabled);
+            btn.classList.toggle('bg-slate-400', !soundEnabled);
+            if (soundEnabled) playSFX('click');
+        }
+
+        function addScore(points) {
+            score += points;
+            const display = document.getElementById('score-display');
+            display.textContent = score;
+            display.parentElement.classList.add('animate-pop');
+            setTimeout(() => display.parentElement.classList.remove('animate-pop'), 400);
+        }
+
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 70,
+                    spread: 65,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        function showModal(emoji, title, message, callback) {
+            playSFX('win');
+            triggerConfetti();
+            document.getElementById('modal-emoji').textContent = emoji;
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            window.currentModalCallback = callback;
+        }
+
+        function closeModal() {
+            playSFX('click');
+            const modal = document.getElementById('custom-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (typeof window.currentModalCallback === 'function') {
+                window.currentModalCallback();
+                window.currentModalCallback = null;
+            }
+        }
+
+        // Switch between the 6 game modes
+        function switchMode(mode) {
+            clearActiveTimer();
+            playSFX('click');
+            currentMode = mode;
+
+            document.querySelectorAll('.mode-tab').forEach(tab => {
+                tab.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-600');
+                tab.classList.add('bg-white', 'text-slate-700', 'border-slate-200');
+            });
+            const activeTab = document.getElementById(`tab-${mode}`);
+            activeTab.classList.remove('bg-white', 'text-slate-700', 'border-slate-200');
+            activeTab.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600');
+
+            if (mode === 'learn') renderLearnMode();
+            else if (mode === 'drag') renderDragMode();
+            else if (mode === 'match') renderMatchMode();
+            else if (mode === 'fill') renderFillMode();
+            else if (mode === 'memory') renderMemoryMode();
+            else if (mode === 'timer') renderTimerMode();
+        }
+
+        function shuffle(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        /* =========================================================
+           1. FLASHCARDS MODE (Learn & Listen)
+           ========================================================= */
+        function renderLearnMode() {
+            const container = document.getElementById('game-container');
+            let cardsHtml = `
+                <div class="bg-white/80 backdrop-blur-sm rounded-3xl p-4 mb-5 border-2 border-sky-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-sky-900">Explore All 12 Travel Flashcards 🌟</h2>
+                        <p class="text-sm text-slate-600">Tap any card to listen to the pronunciation and read its action clue.</p>
+                    </div>
+                    <button onclick="switchMode('drag')" class="btn-3d bg-amber-400 hover:bg-amber-500 text-amber-950 font-extrabold px-5 py-2.5 rounded-2xl text-sm whitespace-nowrap">
+                        Ready to Play? Start! 🎮
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            `;
+
+            VOCABULARY.forEach(item => {
+                cardsHtml += `
+                    <div onclick="speakWord('${item.word}'); this.classList.add('animate-pop'); setTimeout(()=>this.classList.remove('animate-pop'), 350)" 
+                         class="flashcard-border rounded-3xl p-4 cursor-pointer flex flex-col items-center justify-between relative group">
+                        
+                        <button class="absolute top-3 right-3 bg-sky-100 group-hover:bg-sky-500 group-hover:text-white text-sky-700 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm" title="Listen">
+                            🔊
+                        </button>
+
+                        <div class="w-full py-1">
+                            ${renderCardImage(item)}
+                        </div>
+
+                        <div class="w-full border-t border-slate-200 mt-3 pt-3 text-center">
+                            <h3 class="text-2xl font-bold text-slate-900 tracking-wide mb-1">${item.word}</h3>
+                            <span class="inline-block bg-amber-100 text-amber-900 text-xs font-bold px-3 py-1 rounded-full">
+                                ${item.clue}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            cardsHtml += `</div>`;
+            container.innerHTML = cardsHtml;
+        }
+
+        /* =========================================================
+           2. DRAG & DROP MODE (Also supports Tap-to-Place)
+           ========================================================= */
+        let dragRoundItems = [];
+        let selectedWordId = null;
+
+        function renderDragMode() {
+            dragRoundItems = shuffle(VOCABULARY).slice(0, 4);
+            const shuffledWords = shuffle(dragRoundItems);
+            selectedWordId = null;
+
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <div class="bg-white/90 rounded-3xl p-4 mb-5 border-2 border-sky-200 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-lg font-bold text-sky-900">🎯 Drag Each Phrase to the Matching Card</h2>
+                        <p class="text-xs md:text-sm text-slate-600">Drag and drop a phrase, or tap a phrase then tap a card!</p>
+                    </div>
+                    <button onclick="renderDragMode()" class="btn-3d bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold px-4 py-2 rounded-xl text-sm">
+                        🔄 New Cards
+                    </button>
+                </div>
+
+                <!-- Draggable word bank -->
+                <div id="word-bank" class="bg-sky-900/10 border-2 border-dashed border-sky-400 rounded-3xl p-4 mb-6 flex flex-wrap items-center justify-center gap-3 min-h-[76px]">
+                    ${shuffledWords.map(item => `
+                        <div id="drag-word-${item.id}" 
+                             draggable="true"
+                             ondragstart="handleDragStart(event, '${item.id}')"
+                             onclick="handleWordTap('${item.id}')"
+                             class="draggable-word display-font bg-gradient-to-b from-amber-300 to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-bold text-lg md:text-xl px-5 py-2.5 rounded-2xl shadow-md border-2 border-amber-500 transition-transform">
+                            ${item.word}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Target cards grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    ${dragRoundItems.map(item => `
+                        <div id="drop-card-${item.id}"
+                             ondragover="handleDragOver(event)"
+                             ondragleave="handleDragLeave(event)"
+                             ondrop="handleDrop(event, '${item.id}')"
+                             onclick="handleZoneTap('${item.id}')"
+                             class="drop-zone flashcard-border rounded-3xl p-4 flex flex-col items-center justify-between cursor-pointer">
+                            <div class="w-full mb-3">${renderCardImage(item)}</div>
+                            <div id="slot-${item.id}" class="w-full h-12 rounded-2xl border-2 border-dashed border-sky-300 bg-sky-50/70 flex items-center justify-center text-sky-600 font-bold text-sm">
+                                Drop phrase here
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function handleDragStart(e, id) {
+            e.dataTransfer.setData('text/plain', id);
+            const item = VOCABULARY.find(v => v.id === id);
+            if (item) speakWord(item.word);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e, targetId) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const draggedId = e.dataTransfer.getData('text/plain');
+            checkDragMatch(draggedId, targetId);
+        }
+
+        function handleWordTap(id) {
+            const item = VOCABULARY.find(v => v.id === id);
+            if (item) speakWord(item.word);
+
+            document.querySelectorAll('.draggable-word').forEach(el => {
+                el.classList.remove('ring-4', 'ring-sky-500', 'scale-105');
+            });
+
+            if (selectedWordId === id) {
+                selectedWordId = null;
+            } else {
+                selectedWordId = id;
+                const el = document.getElementById(`drag-word-${id}`);
+                if (el) el.classList.add('ring-4', 'ring-sky-500', 'scale-105');
+            }
+        }
+
+        function handleZoneTap(targetId) {
+            if (selectedWordId) {
+                checkDragMatch(selectedWordId, targetId);
+                selectedWordId = null;
+            }
+        }
+
+        function checkDragMatch(draggedId, targetId) {
+            const cardEl = document.getElementById(`drop-card-${targetId}`);
+            const wordEl = document.getElementById(`drag-word-${draggedId}`);
+            if (!wordEl || !cardEl || cardEl.dataset.solved === 'true') return;
+
+            if (draggedId === targetId) {
+                playSFX('correct');
+                addScore(10);
+                cardEl.dataset.solved = 'true';
+                cardEl.classList.remove('border-slate-400');
+                cardEl.classList.add('border-emerald-500', 'bg-emerald-50/40', 'animate-pop');
+
+                const item = VOCABULARY.find(v => v.id === targetId);
+                const slot = document.getElementById(`slot-${targetId}`);
+                slot.className = 'w-full py-2 rounded-2xl bg-emerald-500 text-white font-bold display-font text-xl flex items-center justify-center gap-2 shadow-sm';
+                slot.innerHTML = `<span>✅</span> ${item.word}`;
+
+                wordEl.remove();
+
+                const remaining = document.querySelectorAll('#word-bank .draggable-word').length;
+                if (remaining === 0) {
+                    setTimeout(() => {
+                        showModal('🎉', 'Super Star!', 'You matched all cards correctly! Ready for another round?', renderDragMode);
+                    }, 500);
+                }
+            } else {
+                playSFX('wrong');
+                cardEl.classList.add('animate-shake', 'border-rose-400');
+                setTimeout(() => {
+                    cardEl.classList.remove('animate-shake', 'border-rose-400');
+                }, 450);
+            }
+        }
+
+        /* =========================================================
+           3. MATCH PAIRS MODE (Connect Picture to Phrase)
+           ========================================================= */
+        let matchItems = [];
+        let selectedLeftId = null;
+        let matchedPairs = [];
+
+        function renderMatchMode() {
+            matchItems = shuffle(VOCABULARY).slice(0, 5);
+            const rightItems = shuffle(matchItems);
+            selectedLeftId = null;
+            matchedPairs = [];
+
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <div class="bg-white/90 rounded-3xl p-4 mb-5 border-2 border-sky-200 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-lg font-bold text-sky-900">🔗 Connect Each Picture to Its Phrase</h2>
+                        <p class="text-xs md:text-sm text-slate-600">Select a picture on the left, then tap its matching phrase on the right.</p>
+                    </div>
+                    <button onclick="renderMatchMode()" class="btn-3d bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold px-4 py-2 rounded-xl text-sm">
+                        🔄 New Round
+                    </button>
+                </div>
+
+                <div id="match-board" class="relative bg-white/75 backdrop-blur-sm rounded-3xl p-4 md:p-6 border-2 border-sky-200 shadow-lg">
+                    <svg id="match-svg-layer"></svg>
+                    
+                    <div class="grid grid-cols-2 gap-8 md:gap-20 relative z-20">
+                        <!-- Left column: Pictures -->
+                        <div class="flex flex-col gap-3">
+                            ${matchItems.map(item => `
+                                <button id="match-left-${item.id}" onclick="selectMatchLeft('${item.id}')"
+                                        class="bg-white border-2 border-dashed border-slate-300 hover:border-sky-400 rounded-2xl p-2 shadow-sm flex items-center justify-between gap-2 transition-all h-24 md:h-28">
+                                    <div class="w-24 md:w-32 h-full flex items-center justify-center overflow-hidden rounded-xl">
+                                        <img src="${item.imgSrc}" alt="${item.word}" style="object-position: ${item.imgPos};" class="w-full h-full object-cover rounded-xl ${item.imgScale}">
+                                    </div>
+                                    <span class="text-xs text-slate-600 font-bold hidden sm:inline text-left flex-1 px-2">${item.clue}</span>
+                                    <span class="w-4 h-4 rounded-full bg-sky-200 border-2 border-sky-500 mr-1 shrink-0"></span>
+                                </button>
+                            `).join('')}
+                        </div>
+
+                        <!-- Right column: Phrases -->
+                        <div class="flex flex-col gap-3">
+                            ${rightItems.map(item => `
+                                <button id="match-right-${item.id}" onclick="selectMatchRight('${item.id}')"
+                                        class="bg-white border-2 border-slate-200 hover:border-amber-400 rounded-2xl p-3 shadow-sm flex items-center justify-between transition-all h-20 md:h-24">
+                                    <span class="w-4 h-4 rounded-full bg-amber-200 border-2 border-amber-500 ml-1"></span>
+                                    <span class="display-font text-lg md:text-2xl font-bold text-slate-800 mx-auto">${item.word}</span>
+                                    <span class="text-sky-500 text-lg">🔊</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            window.addEventListener('resize', drawMatchLines);
+        }
+
+        function selectMatchLeft(id) {
+            if (matchedPairs.includes(id)) return;
+            playSFX('click');
+
+            document.querySelectorAll('[id^="match-left-"]').forEach(el => {
+                if (!matchedPairs.includes(el.id.replace('match-left-', ''))) {
+                    el.classList.remove('ring-4', 'ring-sky-400', 'bg-sky-50');
+                }
+            });
+
+            selectedLeftId = id;
+            const el = document.getElementById(`match-left-${id}`);
+            el.classList.add('ring-4', 'ring-sky-400', 'bg-sky-50');
+        }
+
+        function selectMatchRight(rightId) {
+            const item = VOCABULARY.find(v => v.id === rightId);
+            if (item) speakWord(item.word);
+
+            if (!selectedLeftId || matchedPairs.includes(rightId)) return;
+
+            const leftEl = document.getElementById(`match-left-${selectedLeftId}`);
+            const rightEl = document.getElementById(`match-right-${rightId}`);
+
+            if (selectedLeftId === rightId) {
+                playSFX('correct');
+                addScore(10);
+                matchedPairs.push(rightId);
+
+                leftEl.classList.remove('ring-4', 'ring-sky-400', 'bg-sky-50');
+                leftEl.classList.add('bg-emerald-50', 'border-emerald-500');
+                rightEl.classList.add('bg-emerald-50', 'border-emerald-500', 'animate-pop');
+
+                selectedLeftId = null;
+                drawMatchLines();
+
+                if (matchedPairs.length === matchItems.length) {
+                    setTimeout(() => {
+                        showModal('🌟', 'Perfect Match!', 'You connected every picture to its phrase!', renderMatchMode);
+                    }, 500);
+                }
+            } else {
+                playSFX('wrong');
+                rightEl.classList.add('animate-shake', 'bg-rose-50', 'border-rose-400');
+                setTimeout(() => {
+                    rightEl.classList.remove('animate-shake', 'bg-rose-50', 'border-rose-400');
+                }, 450);
+            }
+        }
+
+        function drawMatchLines() {
+            const svg = document.getElementById('match-svg-layer');
+            const board = document.getElementById('match-board');
+            if (!svg || !board) return;
+
+            const boardRect = board.getBoundingClientRect();
+            svg.innerHTML = '';
+
+            matchedPairs.forEach(id => {
+                const leftEl = document.getElementById(`match-left-${id}`);
+                const rightEl = document.getElementById(`match-right-${id}`);
+                if (!leftEl || !rightEl) return;
+
+                const lRect = leftEl.getBoundingClientRect();
+                const rRect = rightEl.getBoundingClientRect();
+
+                const x1 = lRect.right - boardRect.left - 12;
+                const y1 = lRect.top - boardRect.top + (lRect.height / 2);
+                const x2 = rRect.left - boardRect.left + 12;
+                const y2 = rRect.top - boardRect.top + (rRect.height / 2);
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const midX = (x1 + x2) / 2;
+                const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+                line.setAttribute('d', d);
+                line.setAttribute('stroke', '#10B981');
+                line.setAttribute('stroke-width', '5');
+                line.setAttribute('stroke-linecap', 'round');
+                line.setAttribute('fill', 'none');
+                svg.appendChild(line);
+            });
+        }
+
+        /* =========================================================
+           4. COMPLETE THE SENTENCE MODE
+           ========================================================= */
+        let fillQueue = [];
+        let currentFillIndex = 0;
+
+        function renderFillMode() {
+            fillQueue = shuffle(VOCABULARY).slice(0, 6);
+            currentFillIndex = 0;
+            renderFillQuestion();
+        }
+
+        function renderFillQuestion() {
+            const container = document.getElementById('game-container');
+            const currentItem = fillQueue[currentFillIndex];
+
+            const distractors = shuffle(VOCABULARY.filter(v => v.id !== currentItem.id)).slice(0, 3);
+            const options = shuffle([currentItem, ...distractors]);
+
+            const formattedSentence = currentItem.sentence.replace(
+                '_____',
+                `<span id="sentence-blank" class="inline-block min-w-[130px] border-b-4 border-dashed border-sky-500 text-sky-600 px-3 mx-1">?</span>`
+            );
+
+            container.innerHTML = `
+                <div class="max-w-2xl mx-auto w-full bg-white rounded-3xl p-6 md:p-8 shadow-xl border-4 border-sky-200">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <span class="bg-sky-100 text-sky-800 font-extrabold px-4 py-1 rounded-full text-sm">
+                            Question ${currentFillIndex + 1} of ${fillQueue.length}
+                        </span>
+                        <span class="text-xs md:text-sm font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                            💡 Hint: ${currentItem.hint}
+                        </span>
+                    </div>
+
+                    <div class="w-56 mx-auto mb-4 bg-white rounded-3xl p-2.5 border-2 border-dashed border-slate-300">
+                        ${renderCardImage(currentItem)}
+                    </div>
+
+                    <div class="bg-sky-50 rounded-2xl p-5 mb-6 text-center border-2 border-sky-100">
+                        <p class="display-font text-xl md:text-2xl font-bold text-slate-800 leading-relaxed">
+                            ${formattedSentence}
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        ${options.map(opt => `
+                            <button onclick="checkFillAnswer(this, '${opt.id}', '${currentItem.id}')"
+                                    class="btn-3d display-font bg-white hover:bg-amber-50 border-2 border-slate-200 hover:border-amber-400 text-slate-800 font-bold text-xl py-3.5 px-5 rounded-2xl transition-all">
+                                ${opt.word}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function checkFillAnswer(btnEl, selectedId, correctId) {
+            const correctItem = VOCABULARY.find(v => v.id === correctId);
+
+            if (selectedId === correctId) {
+                playSFX('correct');
+                speakWord(correctItem.sentence.replace('_____', correctItem.word));
+                addScore(15);
+
+                btnEl.classList.remove('bg-white', 'border-slate-200');
+                btnEl.classList.add('bg-emerald-500', 'text-white', 'border-emerald-600', 'animate-pop');
+
+                const blank = document.getElementById('sentence-blank');
+                if (blank) {
+                    blank.textContent = correctItem.word;
+                    blank.classList.remove('border-sky-500', 'text-sky-600');
+                    blank.classList.add('border-emerald-500', 'text-emerald-600');
+                }
+
+                btnEl.parentElement.querySelectorAll('button').forEach(b => b.disabled = true);
+
+                setTimeout(() => {
+                    currentFillIndex++;
+                    if (currentFillIndex < fillQueue.length) {
+                        renderFillQuestion();
+                    } else {
+                        showModal('🏆', 'Well Done!', 'You completed all the travel sentences!', renderFillMode);
+                    }
+                }, 1400);
+            } else {
+                playSFX('wrong');
+                btnEl.classList.add('animate-shake', 'bg-rose-100', 'border-rose-400', 'text-rose-800');
+                setTimeout(() => {
+                    btnEl.classList.remove('animate-shake', 'bg-rose-100', 'border-rose-400', 'text-rose-800');
+                }, 500);
+            }
+        }
+
+        /* =========================================================
+           5. MEMORY FLIP GAME
+           ========================================================= */
+        let memoryDeck = [];
+        let flippedCards = [];
+        let matchedMemoryIds = [];
+        let memoryMoves = 0;
+        let memoryLock = false;
+
+        function renderMemoryMode() {
+            const chosen = shuffle(VOCABULARY).slice(0, 4);
+            const deck = [];
+
+            chosen.forEach(item => {
+                deck.push({
+                    uid: `${item.id}-img`,
+                    pairId: item.id,
+                    type: 'image',
+                    item
+                });
+                deck.push({
+                    uid: `${item.id}-word`,
+                    pairId: item.id,
+                    type: 'word',
+                    item
+                });
+            });
+
+            memoryDeck = shuffle(deck);
+            flippedCards = [];
+            matchedMemoryIds = [];
+            memoryMoves = 0;
+            memoryLock = false;
+
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <div class="bg-white/90 rounded-3xl p-4 mb-5 border-2 border-sky-200 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-sky-900">🃏 Memory Game: Match Picture & Phrase</h2>
+                        <p class="text-xs md:text-sm text-slate-600">Flip two cards to pair each original illustration with its phrase.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="bg-amber-100 text-amber-900 font-extrabold px-3.5 py-1.5 rounded-xl text-sm">
+                            Moves: <span id="memory-moves">0</span>
+                        </span>
+                        <button onclick="renderMemoryMode()" class="btn-3d bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold px-4 py-2 rounded-xl text-sm">
+                            🔄 Shuffle
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    ${memoryDeck.map((card, idx) => `
+                        <div id="mem-card-${idx}"
+                             onclick="flipMemoryCard(${idx})"
+                             class="memory-card memory-card-perspective h-52 cursor-pointer">
+                            <div class="memory-card-inner shadow-md rounded-[22px]">
+                                <!-- Card Back (before flipping) -->
+                                <div class="memory-card-front bg-gradient-to-br from-sky-500 to-indigo-600 border-2 border-white flex flex-col items-center justify-center text-white p-3">
+                                    <span class="text-4xl mb-2">🧳</span>
+                                    <span class="font-bold text-sm bg-white/20 px-3 py-1 rounded-full">Travel Card</span>
+                                </div>
+
+                                <!-- Card Front (after flipping) -->
+                                <div class="memory-card-back bg-white border-2 border-dashed border-sky-400 p-3 flex flex-col items-center justify-center text-center">
+                                    ${card.type === 'image'
+                                        ? `
+                                            ${renderCardImage(card.item)}
+                                            <span class="text-xs font-bold text-slate-500 mt-2">${card.item.clue}</span>
+                                          `
+                                        : `
+                                            <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl mb-2">🔤</div>
+                                            <span class="display-font text-xl font-bold text-slate-900">${card.item.word}</span>
+                                            <span class="text-xs text-sky-700 font-bold mt-1">${card.item.clue}</span>
+                                          `
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function flipMemoryCard(index) {
+            if (memoryLock) return;
+            const cardEl = document.getElementById(`mem-card-${index}`);
+            const cardData = memoryDeck[index];
+            if (!cardEl || !cardData) return;
+
+            if (cardEl.classList.contains('flipped') || matchedMemoryIds.includes(cardData.pairId)) return;
+
+            playSFX('click');
+            if (cardData.type === 'word') {
+                speakWord(cardData.item.word);
+            }
+
+            cardEl.classList.add('flipped');
+            flippedCards.push({ index, cardEl, cardData });
+
+            if (flippedCards.length === 2) {
+                memoryMoves++;
+                document.getElementById('memory-moves').textContent = memoryMoves;
+                memoryLock = true;
+
+                const [first, second] = flippedCards;
+                if (first.cardData.pairId === second.cardData.pairId) {
+                    playSFX('correct');
+                    addScore(15);
+                    matchedMemoryIds.push(first.cardData.pairId);
+                    speakWord(first.cardData.item.word);
+
+                    first.cardEl.querySelector('.memory-card-back').classList.add('bg-emerald-50', 'border-emerald-500');
+                    second.cardEl.querySelector('.memory-card-back').classList.add('bg-emerald-50', 'border-emerald-500');
+
+                    flippedCards = [];
+                    memoryLock = false;
+
+                    if (matchedMemoryIds.length === 4) {
+                        setTimeout(() => {
+                            showModal('🃏', 'Memory Champion!', `You matched all pairs in ${memoryMoves} moves!`, renderMemoryMode);
+                        }, 550);
+                    }
+                } else {
+                    playSFX('wrong');
+                    setTimeout(() => {
+                        first.cardEl.classList.remove('flipped');
+                        second.cardEl.classList.remove('flipped');
+                        flippedCards = [];
+                        memoryLock = false;
+                    }, 950);
+                }
+            }
+        }
+
+        /* =========================================================
+           6. TIME RUSH CHALLENGE MODE
+           ========================================================= */
+        let timeLeft = 45;
+        let timerScore = 0;
+        let currentTimerTarget = null;
+        let timerActive = false;
+
+        function renderTimerMode() {
+            clearActiveTimer();
+            timeLeft = 45;
+            timerScore = 0;
+            timerActive = true;
+
+            const container = document.getElementById('game-container');
+            container.innerHTML = `
+                <div class="max-w-3xl mx-auto w-full bg-white/95 rounded-3xl p-5 md:p-7 shadow-xl border-2 border-amber-300">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b-2 border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">⏱️</span>
+                            <div>
+                                <h2 class="text-lg font-bold text-sky-900">Time Rush Challenge</h2>
+                                <p class="text-xs text-slate-500">Tap the matching card before time runs out!</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <div class="bg-emerald-100 text-emerald-900 font-extrabold px-4 py-1.5 rounded-2xl text-sm">
+                                Correct: <span id="timer-correct-count">0</span>
+                            </div>
+                            <div id="timer-badge" class="bg-rose-100 text-rose-700 border-2 border-rose-300 font-extrabold px-4 py-1.5 rounded-2xl text-base">
+                                ⏳ <span id="timer-seconds">45</span>s
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="timer-question-area"></div>
+                </div>
+            `;
+
+            loadNextTimerRound();
+
+            timerInterval = setInterval(() => {
+                if (!timerActive) return;
+                timeLeft--;
+                const secEl = document.getElementById('timer-seconds');
+                const badgeEl = document.getElementById('timer-badge');
+                if (secEl) secEl.textContent = timeLeft;
+
+                if (timeLeft <= 10 && badgeEl) {
+                    badgeEl.classList.add('animate-pulse', 'bg-rose-500', 'text-white');
+                }
+
+                if (timeLeft <= 0) {
+                    finishTimerChallenge();
+                }
+            }, 1000);
+        }
+
+        function loadNextTimerRound() {
+            if (!timerActive) return;
+            currentTimerTarget = VOCABULARY[Math.floor(Math.random() * VOCABULARY.length)];
+            const distractors = shuffle(VOCABULARY.filter(v => v.id !== currentTimerTarget.id)).slice(0, 3);
+            const choices = shuffle([currentTimerTarget, ...distractors]);
+
+            speakWord(currentTimerTarget.word);
+
+            const area = document.getElementById('timer-question-area');
+            if (!area) return;
+
+            area.innerHTML = `
+                <div class="text-center mb-6">
+                    <span class="text-xs font-bold text-sky-700 bg-sky-100 px-3 py-1 rounded-full">Find the card for:</span>
+                    <div class="mt-2 flex items-center justify-center gap-3">
+                        <h3 class="display-font text-3xl md:text-4xl font-bold text-slate-900">${currentTimerTarget.word}</h3>
+                        <button onclick="speakWord('${currentTimerTarget.word}')" class="btn-3d bg-sky-500 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg">
+                            🔊
+                        </button>
+                    </div>
+                    <p class="text-sm text-amber-800 font-bold mt-1">${currentTimerTarget.clue}</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${choices.map(item => `
+                        <button onclick="checkTimerChoice(this, '${item.id}')"
+                                class="flashcard-border rounded-3xl p-3 text-center cursor-pointer transition-all hover:border-amber-400">
+                            ${renderCardImage(item)}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function checkTimerChoice(btnEl, chosenId) {
+            if (!timerActive || !currentTimerTarget) return;
+
+            if (chosenId === currentTimerTarget.id) {
+                playSFX('correct');
+                addScore(10);
+                timerScore++;
+                const countEl = document.getElementById('timer-correct-count');
+                if (countEl) countEl.textContent = timerScore;
+
+                btnEl.classList.add('border-emerald-500', 'bg-emerald-50', 'animate-pop');
+                loadNextTimerRound();
+            } else {
+                playSFX('wrong');
+                btnEl.classList.add('animate-shake', 'border-rose-400', 'bg-rose-50');
+                setTimeout(() => {
+                    btnEl.classList.remove('animate-shake', 'border-rose-400', 'bg-rose-50');
+                }, 400);
+            }
+        }
+
+        function finishTimerChallenge() {
+            clearActiveTimer();
+            timerActive = false;
+            showModal(
+                '⏱️',
+                'Time’s Up!',
+                `Great effort! You answered ${timerScore} flashcards correctly.`,
+                renderTimerMode
+            );
+        }
+
+        // Start in Flashcards mode on load
+        window.onload = function() {
+            renderLearnMode();
+        };
+    </script>
+</body>
+</html>
